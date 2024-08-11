@@ -173,6 +173,18 @@ r.AddPassthrough(func(req *http.Request) bool {
 })
 ```
 
+## Server Side
+
+VCR testing can also be used for creating server-side tests. Use the
+`recorder.Middleware` with an HTTP handler in order to create fixtures from
+incoming requests and the handler's responses. Then, these requests can be
+replayed and compared against the recorded responses to create a regression test.
+
+Rather than mocking/recording external HTTP interactions, this will record and
+replay _incoming_ interactions with your application's HTTP server.
+
+See [an example here](./examples/middleware_test.go).
+
 ## License
 
 `go-vcr` is Open Source and licensed under the

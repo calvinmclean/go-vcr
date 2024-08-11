@@ -294,7 +294,8 @@ func (rec *Recorder) getRoundTripper() http.RoundTripper {
 }
 
 // Proxies client requests to their original destination
-func (rec *Recorder) requestHandler(r *http.Request) (*cassette.Interaction, error) {
+// If serverResponse is provided, this is used for the recording instead of using RoundTrip
+func (rec *Recorder) requestHandler(r *http.Request, serverResponse *http.Response) (*cassette.Interaction, error) {
 	if err := r.Context().Err(); err != nil {
 		return nil, err
 	}
@@ -364,11 +365,15 @@ func (rec *Recorder) requestHandler(r *http.Request) (*cassette.Interaction, err
 	}
 
 	// Perform request to it's original destination and record the interactions
+	// If serverResponse is provided, use it instead
 	var start time.Time
 	start = time.Now()
-	resp, err := rec.getRoundTripper().RoundTrip(r)
-	if err != nil {
-		return nil, err
+	resp := serverResponse
+	if resp == nil {
+		resp, err = rec.getRoundTripper().RoundTrip(r)
+		if err != nil {
+			return nil, err
+		}
 	}
 	requestDuration := time.Since(start)
 	defer resp.Body.Close()
@@ -498,6 +503,11 @@ func (rec *Recorder) SetBlockRealTransportUnsafeMethods(value bool) {
 
 // RoundTrip implements the http.RoundTripper interface
 func (rec *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	return rec.executeAndRecord(req, nil)
+}
+
+// executeAndRecord is used internally by the Middleware to allow recording a response on the server side
+func (rec *Recorder) executeAndRecord(req *http.Request, serverResponse *http.Response) (*http.Response, error) {
 	// Passthrough mode, use real transport
 	if rec.options.Mode == ModePassthrough {
 		return rec.getRoundTripper().RoundTrip(req)
@@ -510,7 +520,7 @@ func (rec *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	interaction, err := rec.requestHandler(req)
+	interaction, err := rec.requestHandler(req, serverResponse)
 	if err != nil {
 		return nil, err
 	}
